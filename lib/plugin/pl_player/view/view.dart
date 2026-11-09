@@ -29,6 +29,7 @@ import 'package:PiliPlus/pages/common/common_intro_controller.dart';
 import 'package:PiliPlus/pages/danmaku/danmaku_model.dart';
 import 'package:PiliPlus/pages/live_room/widgets/bottom_control.dart'
     as live_bottom;
+import 'package:PiliPlus/pages/video/clip/clip_dialog.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/pgc/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/controller.dart';
@@ -842,6 +843,20 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         },
       ),
 
+      /// Clip and convert a time range
+      BottomControlType.clip => ComBtn(
+        width: widgetWidth,
+        height: 30,
+        tooltip: 'Clip & convert',
+        icon: const Icon(Icons.content_cut, size: 20, color: Colors.white),
+        onTap: () => showClipDialog(
+          context: context,
+          controller: videoDetailController,
+          title: introController.videoDetail.value.title ?? 'video',
+          initialStart: plPlayerController.position.value,
+        ),
+      ),
+
       /// 全屏
       BottomControlType.fullscreen => ComBtn(
         width: widgetWidth,
@@ -879,6 +894,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       .subtitle,
       .speed,
       if (isNotFileSource && flag) .qa,
+      if (Platform.isWindows && isNotFileSource) .clip,
       if (!plPlayerController.isDesktopPip) .fullscreen,
     ];
     return PlayerBar(

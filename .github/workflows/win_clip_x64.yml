@@ -1,0 +1,65 @@
+name: Build Windows x64 (Clip)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-clip:
+    name: Windows x64 portable
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+
+      - name: Set version
+        shell: pwsh
+        run: lib/scripts/build.ps1
+
+      - name: Apply Flutter and package patches
+        shell: pwsh
+        run: lib/scripts/patch.ps1 windows
+
+      - name: Download ffmpeg
+        shell: pwsh
+        run: |
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+          Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-dist -Force
+          $exe = Get-ChildItem ffmpeg-dist -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          New-Item -ItemType Directory -Force windows/ffmpeg | Out-Null
+          Copy-Item $exe.FullName windows/ffmpeg/ffmpeg.exe
+          Write-Host "ffmpeg: $($exe.FullName)"
+
+      - name: Build Windows release
+        run: flutter build windows --release --dart-define-from-file=pili_release.json
+
+      - name: Verify bundle
+        shell: pwsh
+        run: |
+          $release = "build/windows/x64/runner/Release"
+          if (!(Test-Path "$release/piliplus.exe")) { throw "missing piliplus.exe" }
+          if (!(Test-Path "$release/ffmpeg/ffmpeg.exe")) { throw "missing bundled ffmpeg" }
+          Get-ChildItem $release | Select-Object Name
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "PiliPlus-Clip-Windows-x64.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PiliPlus-Clip-Windows-x64
+          path: PiliPlus-Clip-Windows-x64.zip
+          if-no-files-found: error
