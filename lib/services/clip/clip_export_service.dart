@@ -175,8 +175,9 @@ class ClipExporter {
       return const ClipExportResult.failure('No video stream URL available.');
     }
 
-    final baseName =
-        '${_sanitizeFileName(title)}_${formatTimecode(start)}-${formatTimecode(end)}';
+    final safeStart = formatTimecode(start).replaceAll(':', '-');
+    final safeEnd = formatTimecode(end).replaceAll(':', '-');
+    final baseName = '${_sanitizeFileName(title)}_$safeStart-$safeEnd';
     final fileName = baseName.toLowerCase().endsWith('.${format.extension}')
         ? baseName
         : '$baseName.${format.extension}';
