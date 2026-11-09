@@ -6,11 +6,16 @@ import 'package:nativeapi/nativeapi.dart' as nativeapi;
 /// 判定上次保存的窗口位置是否还有效时，要求至少有多少像素留在工作区内
 const double kWindowKeepVisible = 30.0;
 
-/// 窗口尺寸不得超过工作区，避免恢复出一个比屏幕还大的窗口
-Size fitWindowSizeToWorkArea(Size windowSize, Rect workArea) => Size(
-  math.min(windowSize.width, workArea.width),
-  math.min(windowSize.height, workArea.height),
-);
+/// 窗口尺寸不得超过工作区，也不得小于可用最小尺寸；
+/// 避免从损坏的设置中恢复出一个无法操作的窗口。
+Size fitWindowSizeToWorkArea(Size windowSize, Rect workArea) {
+  final minWidth = math.min(400.0, workArea.width);
+  final minHeight = math.min(720.0, workArea.height);
+  return Size(
+    math.min(math.max(windowSize.width, minWidth), workArea.width),
+    math.min(math.max(windowSize.height, minHeight), workArea.height),
+  );
+}
 
 /// 最小窗口尺寸不得超过工作区，否则小屏（如 1024×640）上窗口无法收缩到屏幕内
 nativeapi.Size fitMinSizeToWorkArea(nativeapi.Size minSize, Rect workArea) =>

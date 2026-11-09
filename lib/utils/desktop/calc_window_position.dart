@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:PiliPlus/utils/desktop/window_bounds.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:collection/collection.dart';
@@ -18,7 +20,10 @@ const _displayManager = nativeapi.DisplayManager.instance;
   if (workArea == null) {
     minSize = _kMinSize;
 
-    final windowSize = Pref.windowSize;
+    final windowSize = Size(
+      math.max(Pref.windowSize.width, 400.0),
+      math.max(Pref.windowSize.height, 720.0),
+    );
     bounds = nativeapi.Rectangle(
       x: 0,
       y: 0,
@@ -46,6 +51,33 @@ const _displayManager = nativeapi.DisplayManager.instance;
 }
 
 Rect? get _currentWorkArea => _currentDisplay?.workArea.toRect();
+
+const double _kUsableWidth = 400.0;
+const double _kUsableHeight = 300.0;
+
+bool _isUsable(Rect area) =>
+    area.width >= _kUsableWidth && area.height >= _kUsableHeight;
+
+nativeapi.Display? get _currentDisplay {
+  final displays = _displayManager.getAll().where((display) {
+    return _isUsable(display.workArea.toRect());
+  }).toList();
+  if (displays.isEmpty) {
+    return null;
+  }
+  final cursorPosition = _displayManager.getCursorPosition().toOffset();
+  return displays.firstWhereOrNull(
+        (display) => (display.position.toOffset() & display.size.toSize())
+            .contains(cursorPosition),
+      ) ??
+      displays.reduce(
+        (a, b) =>
+            a.workArea.toRect().width * a.workArea.toRect().height >=
+                    b.workArea.toRect().width * b.workArea.toRect().height
+            ? a
+            : b,
+      );
+}
 
 Offset? get _savedWindowPosition {
   final position = Pref.windowPosition;
