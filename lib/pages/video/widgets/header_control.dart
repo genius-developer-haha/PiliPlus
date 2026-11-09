@@ -26,6 +26,7 @@ import 'package:PiliPlus/pages/setting/models/play_settings.dart'
     show showPlayerVolumeDialog;
 import 'package:PiliPlus/pages/setting/widgets/popup_item.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
+import 'package:PiliPlus/pages/video/clip/clip_dialog.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/local/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/pgc/controller.dart';
@@ -1722,6 +1723,37 @@ class HeaderControlState extends State<HeaderControl>
               children: [
                 // show current datetime
                 ...?timeBatteryWidgets,
+                if (Platform.isWindows &&
+                    !isFileSource &&
+                    !plPlayerController.isDesktopPip) ...[
+                  SizedBox(
+                    height: btnHeight,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.white.withValues(alpha: 0.16),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        shape: const StadiumBorder(),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      onPressed: () => showClipDialog(
+                        context: context,
+                        controller: videoDetailCtr,
+                        title:
+                            introController.videoDetail.value.title ?? 'video',
+                        initialStart: Duration(
+                          milliseconds: plPlayerController.position.value,
+                        ),
+                      ),
+                      icon: const Icon(Icons.content_cut, size: 16),
+                      label: const Text(
+                        'Clip',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 if (PlatformUtils.isDesktop && !plPlayerController.isDesktopPip)
                   Obx(() {
                     final isAlwaysOnTop =
