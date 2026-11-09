@@ -6,6 +6,10 @@ on:
 permissions:
   contents: read
 
+env:
+  FLUTTER_STORAGE_BASE_URL: https://storage.flutter-io.cn
+  PUB_HOSTED_URL: https://pub.flutter-io.cn
+
 jobs:
   build-windows-clip:
     name: Windows x64 portable
@@ -16,11 +20,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version-file: pubspec.yaml
+      - name: Setup Flutter from mirror
+        shell: pwsh
+        run: |
+          $version = '3.47.9'
+          $sha256 = 'd8e2b5977e09082c6440f89dc1aa887b94c8fbcc3b39222797046295a3f68a9e'
+          $sdk = Join-Path $env:RUNNER_TEMP 'flutter_sdk'
+          New-Item -ItemType Directory -Force -Path $env:RUNNER_TEMP | Out-Null
+          $zip = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+          $mirrors = @(
+            "https://storage.flutter-io.cn/flutter_infra_release/releases/stable/windows/flutter_windows_$version-stable.zip",
+            "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_$version-stable.zip"
+          )
+          $ok = $false
+          foreach ($url in $mirrors) {
+            if ($ok) { break }
+            for ($i = 1; $i -le 4 -and -not $ok; $i++) {
+              Write-Host "download $url try $i"
+              curl.exe -L --fail --retry 3 --retry-delay 5 --connect-timeout 30 -o $zip $url
+              if (Test-Path $zip) {
+                $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+                if ($hash -eq $sha256) { $ok = $true; break }
+                Remove-Item $zip -Force
+              }
+              Start-Sleep -Seconds 8
+            }
+          }
+          if (-not $ok) { throw 'failed to download flutter sdk' }
+          Expand-Archive -Path $zip -DestinationPath $env:RUNNER_TEMP -Force
+          Move-Item (Join-Path $env:RUNNER_TEMP 'flutter') $sdk -Force
+          "$sdk\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $env:PATH = "$sdk\bin;$env:PATH"
+          flutter --version
+          flutter precache --windows
 
       - name: Set version
         shell: pwsh
@@ -33,9 +65,25 @@ jobs:
       - name: Download ffmpeg
         shell: pwsh
         run: |
-          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-          Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
-          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-dist -Force
+          $target = 'ffmpeg-master-latest-win64-gpl.zip'
+          $mirrors = @(
+            'https://ghfast.top/https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip',
+            'https://gh-proxy.com/https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip',
+            'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'
+          )
+          $ok = $false
+          foreach ($url in $mirrors) {
+            if ($ok) { break }
+            for ($i = 1; $i -le 3 -and -not $ok; $i++) {
+              Write-Host "download ffmpeg from $url try $i"
+              curl.exe -L --fail --retry 3 --retry-delay 5 --connect-timeout 30 -o $target $url
+              if ((Test-Path $target) -and (Get-Item $target).Length -gt 10MB) { $ok = $true; break }
+              if (Test-Path $target) { Remove-Item $target -Force }
+              Start-Sleep -Seconds 8
+            }
+          }
+          if (-not $ok) { throw 'failed to download ffmpeg' }
+          Expand-Archive $target -DestinationPath ffmpeg-dist -Force
           $exe = Get-ChildItem ffmpeg-dist -Recurse -Filter ffmpeg.exe | Select-Object -First 1
           New-Item -ItemType Directory -Force windows/ffmpeg | Out-Null
           Copy-Item $exe.FullName windows/ffmpeg/ffmpeg.exe
@@ -54,8 +102,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path build/windows/x64 | Out-Null
           $items = @(
-            @{ url = 'https://github.com/bggRGjQaUbCoE/mpv-winbuild-cmake/releases/download/20260607/mpv-dev-x86_64-20260607-git-43b14a4.7z'; md5 = 'b84900bbc6fcb995ca6a24f62bee671f'; file = 'mpv-dev-x86_64-20260607-git-43b14a4.7z' },
-            @{ url = 'https://github.com/alexmercerind/flutter-windows-ANGLE-OpenGL-ES/releases/download/v1.0.1/ANGLE.7z'; md5 = 'e866f13e8d552348058afaafe869b1ed'; file = 'ANGLE.7z' }
+            @{ path = 'bggRGjQaUbCoE/mpv-winbuild-cmake/releases/download/20260607/mpv-dev-x86_64-20260607-git-43b14a4.7z'; md5 = 'b84900bbc6fcb995ca6a24f62bee671f'; file = 'mpv-dev-x86_64-20260607-git-43b14a4.7z' },
+            @{ path = 'alexmercerind/flutter-windows-ANGLE-OpenGL-ES/releases/download/v1.0.1/ANGLE.7z'; md5 = 'e866f13e8d552348058afaafe869b1ed'; file = 'ANGLE.7z' }
           )
           foreach ($item in $items) {
             $dest = Join-Path 'build/windows/x64' $item.file
@@ -66,17 +114,26 @@ jobs:
               }
               Remove-Item $dest -Force
             }
+            $mirrors = @(
+              "https://ghfast.top/https://github.com/$($item.path)",
+              "https://gh-proxy.com/https://github.com/$($item.path)",
+              "https://github.com/$($item.path)"
+            )
             $ok = $false
-            for ($i = 1; $i -le 6 -and -not $ok; $i++) {
-              curl.exe -L --fail --retry 3 --retry-delay 5 --connect-timeout 30 -o $dest $item.url
-              if (Test-Path $dest) {
-                if ((Get-FileHash $dest -Algorithm MD5).Hash.ToLower() -eq $item.md5) {
-                  $ok = $true
-                  break
+            foreach ($url in $mirrors) {
+              if ($ok) { break }
+              for ($i = 1; $i -le 4 -and -not $ok; $i++) {
+                Write-Host "download $($item.file) from $url try $i"
+                curl.exe -L --fail --retry 3 --retry-delay 5 --connect-timeout 30 -o $dest $url
+                if (Test-Path $dest) {
+                  if ((Get-FileHash $dest -Algorithm MD5).Hash.ToLower() -eq $item.md5) {
+                    $ok = $true
+                    break
+                  }
+                  Remove-Item $dest -Force
                 }
-                Remove-Item $dest -Force
+                Start-Sleep -Seconds 8
               }
-              Start-Sleep -Seconds 8
             }
             if (-not $ok) { throw "failed to fetch $($item.file)" }
           }
