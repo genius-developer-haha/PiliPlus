@@ -1000,7 +1000,7 @@ abstract final class Pref {
       _setting.get(SettingBoxKey.fullScreenSCScale, defaultValue: 1.0);
 
   static bool get minimizeOnExit =>
-      _setting.get(SettingBoxKey.minimizeOnExit, defaultValue: true);
+      _setting.get(SettingBoxKey.minimizeOnExit, defaultValue: false);
 
   static Size get windowSize {
     final List<double>? size = (_setting.get(SettingBoxKey.windowSize) as List?)

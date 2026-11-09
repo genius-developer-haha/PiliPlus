@@ -6,8 +6,45 @@
 #include "flutter_window.h"
 #include "utils.h"
 
+namespace {
+
+BOOL CALLBACK FindRunnerWindow(HWND hwnd, LPARAM result) {
+  wchar_t class_name[256];
+  if (::GetClassNameW(hwnd, class_name, 256) == 0) {
+    return TRUE;
+  }
+  if (::lstrcmpW(class_name, L"FLUTTER_RUNNER_WIN32_WINDOW") == 0) {
+    *reinterpret_cast<HWND*>(result) = hwnd;
+    return FALSE;
+  }
+  return TRUE;
+}
+
+// A second launch should bring the already running app back on screen instead
+// of silently exiting while its window stays hidden in the tray.
+void ActivateExistingWindow() {
+  HWND existing = nullptr;
+  ::EnumWindows(FindRunnerWindow, reinterpret_cast<LPARAM>(&existing));
+  if (existing == nullptr) {
+    return;
+  }
+  if (::IsIconic(existing)) {
+    ::ShowWindow(existing, SW_RESTORE);
+  } else {
+    ::ShowWindow(existing, SW_SHOW);
+  }
+  // The Dart side may have faded the window before hiding it to the tray.
+  if (::GetWindowLongPtr(existing, GWL_EXSTYLE) & WS_EX_LAYERED) {
+    ::SetLayeredWindowAttributes(existing, 0, 255, LWA_ALPHA);
+  }
+  ::SetForegroundWindow(existing);
+}
+
+}  // namespace
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
+  ActivateExistingWindow();
   if (SendAppLinkToInstance()) {
     return EXIT_SUCCESS;
   }
