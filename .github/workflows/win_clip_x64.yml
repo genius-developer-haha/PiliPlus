@@ -41,6 +41,46 @@ jobs:
           Copy-Item $exe.FullName windows/ffmpeg/ffmpeg.exe
           Write-Host "ffmpeg: $($exe.FullName)"
 
+      - name: Cache media libraries
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/windows/x64/ANGLE.7z
+            build/windows/x64/mpv-dev-x86_64-20260607-git-43b14a4.7z
+          key: media-libs-angle101-mpv20260607
+
+      - name: Fetch media libraries
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build/windows/x64 | Out-Null
+          $items = @(
+            @{ url = 'https://github.com/bggRGjQaUbCoE/mpv-winbuild-cmake/releases/download/20260607/mpv-dev-x86_64-20260607-git-43b14a4.7z'; md5 = 'b84900bbc6fcb995ca6a24f62bee671f'; file = 'mpv-dev-x86_64-20260607-git-43b14a4.7z' },
+            @{ url = 'https://github.com/alexmercerind/flutter-windows-ANGLE-OpenGL-ES/releases/download/v1.0.1/ANGLE.7z'; md5 = 'e866f13e8d552348058afaafe869b1ed'; file = 'ANGLE.7z' }
+          )
+          foreach ($item in $items) {
+            $dest = Join-Path 'build/windows/x64' $item.file
+            if (Test-Path $dest) {
+              if ((Get-FileHash $dest -Algorithm MD5).Hash.ToLower() -eq $item.md5) {
+                Write-Host "cached $($item.file)"
+                continue
+              }
+              Remove-Item $dest -Force
+            }
+            $ok = $false
+            for ($i = 1; $i -le 6 -and -not $ok; $i++) {
+              curl.exe -L --fail --retry 3 --retry-delay 5 --connect-timeout 30 -o $dest $item.url
+              if (Test-Path $dest) {
+                if ((Get-FileHash $dest -Algorithm MD5).Hash.ToLower() -eq $item.md5) {
+                  $ok = $true
+                  break
+                }
+                Remove-Item $dest -Force
+              }
+              Start-Sleep -Seconds 8
+            }
+            if (-not $ok) { throw "failed to fetch $($item.file)" }
+          }
+
       - name: Build Windows release
         run: flutter build windows --release --dart-define-from-file=pili_release.json
 
