@@ -853,7 +853,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           context: context,
           controller: videoDetailController,
           title: introController.videoDetail.value.title ?? 'video',
-          initialStart: plPlayerController.position.value,
+          initialStart: Duration(
+            milliseconds: plPlayerController.position.value,
+          ),
         ),
       ),
 
