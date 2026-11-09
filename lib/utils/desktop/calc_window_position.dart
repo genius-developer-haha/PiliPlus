@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:PiliPlus/utils/desktop/window_bounds.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:collection/collection.dart';
-import 'package:flutter/rendering.dart' show Offset, Rect;
+import 'package:flutter/rendering.dart' show Offset, Rect, Size;
 import 'package:nativeapi/nativeapi.dart' as nativeapi;
 import 'package:screen_retriever/screen_retriever.dart';
 
@@ -83,14 +83,4 @@ Offset? get _savedWindowPosition {
   final position = Pref.windowPosition;
   if (position == null || position.length < 2) return null;
   return Offset(position[0], position[1]);
-}
-
-nativeapi.Display? get _currentDisplay {
-  final displays = _displayManager.getAll();
-  final cursorPosition = _displayManager.getCursorPosition().toOffset();
-  return displays.firstWhereOrNull(
-        (display) => (display.position.toOffset() & display.size.toSize())
-            .contains(cursorPosition),
-      ) ??
-      _displayManager.getPrimary();
 }
