@@ -44,7 +44,6 @@ Duration? parseTimecode(String text) {
     if (value == null || value < 0) return null;
     seconds = seconds * 60 + value;
   }
-  if (seconds <= 0) return null;
   return Duration(milliseconds: (seconds * 1000).round());
 }
 
@@ -60,9 +59,19 @@ String formatTimecode(Duration duration) {
 }
 
 String _sanitizeFileName(String name) {
-  final sanitized = name.replaceAll(RegExp(r'[\\/:*?"<>|]'), ' ').trim();
-  final collapsed = sanitized.replaceAll(RegExp(r'\s+'), ' ');
-  return collapsed.length > 80 ? collapsed.substring(0, 80).trim() : collapsed;
+  var sanitized = name
+      .replaceAll(RegExp(r'\|'), '-')
+      .replaceAll(RegExp(r'[\\/:*?"<>]'), ' ')
+      .replaceAll(RegExp(r'[\x00-\x1F\x7F]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  while (sanitized.endsWith('.') || sanitized.endsWith(' ')) {
+    sanitized = sanitized.substring(0, sanitized.length - 1).trimRight();
+  }
+  if (sanitized.length > 80) {
+    sanitized = sanitized.substring(0, 80).trim();
+  }
+  return sanitized.isEmpty ? 'clip' : sanitized;
 }
 
 class ClipExporter {
